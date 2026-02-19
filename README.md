@@ -1,4 +1,6 @@
 # TracChat 💬 — P2P Chat + TRAC Wallet Integration
+<img width="922" height="855" alt="image" src="https://github.com/user-attachments/assets/10b8b33e-d4a1-4b18-be6f-1db327de1761" />
+<img width="909" height="844" alt="image" src="https://github.com/user-attachments/assets/4b672968-4d56-49bc-9330-0280d7b85a2c" />
 
 > A decentralized peer-to-peer chat application built on [Intercom](https://github.com/Trac-Systems/intercom) (Trac Network) with **live TRAC wallet balance & transaction checking** via an integrated bot.
 
