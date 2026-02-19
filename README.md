@@ -76,8 +76,8 @@ This is the fastest way to try TracChat. No Pear, no Node, no install.
 
 ```bash
 # Clone the repo
-git clone https://github.com/YOUR_USERNAME/intercom
-cd intercom
+git clone https://github.com/Kizimakai/awesome-intercom-intercomchat-ai.git
+cd awesome-intercom-intercomchat-ai
 
 # Open in browser
 open index.html
@@ -105,8 +105,8 @@ Before you start, make sure you have:
 #### Step 1 — Clone & Install Backend
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/intercom
-cd intercom
+git clone https://github.com/Kizimakai/awesome-intercom-intercomchat-ai.git
+cd awesome-intercom-intercomchat-ai
 npm install
 ```
 
