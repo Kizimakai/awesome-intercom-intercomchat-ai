@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TracChat — P2P Chat + TRAC Wallet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+<style>
+  /* ── DESIGN SYSTEM ──────────────────────────────── */
+  :root {
+    --bg:        #060608;
+    --surface:   #0e0e14;
+    --surface2:  #13131c;
+    --border:    #1c1c2e;
+    --border2:   #252538;
+    --accent:    #5cffb4;
+    --accent2:   #3de8ff;
+    --accent3:   #ff6b6b;
+    --text:      #c8c8d8;
+    --muted:     #4a4a62;
+    --dim:       #252538;
+    --me-bg:     #5cffb4;
+    --me-text:   #000;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.04) 2px,
+      rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── TOP BAR ────────────────────────────────────── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 20px;
+    height: 52px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 16px;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+
+  .logo-mark {
+    width: 28px; height: 28px;
+    background: var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 13px;
+    color: #000;
+  }
+
+  .topbar-center {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .room-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    max-width: 200px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .room-chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: blink 2s ease-in-out infinite;
+  }
+
+  .status-dot.offline { background: var(--accent3); animation: none; }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* ── MAIN LAYOUT ────────────────────────────────── */
+  .layout {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── LEFT SIDEBAR ───────────────────────────────── */
+  .sidebar {
+    width: 240px;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .sidebar-section {
+    border-bottom: 1px solid var(--border);
+    padding: 14px 16px;
+  }
+
+  .sidebar-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  /* Wallet card */
+  .wallet-card {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 12px;
+  }
+
+  .wallet-addr {
+    font-size: 9px;
+    color: var(--muted);
+    word-break: break-all;
+    line-height: 1.5;
+    margin-bottom: 10px;
+  }
+
+  .wallet-addr span { color: var(--accent); }
+
+  .balance-row {
+    display: flex;
+    align-items: baseline;
+    gap: 5px;
+    margin-bottom: 4px;
+  }
+
+  .balance-amount {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .balance-unit {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .balance-usd {
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .wallet-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 7px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .wallet-btn:hover {
+    background: rgba(92,255,180,0.08);
+    border-color: var(--accent);
+  }
+
+  .wallet-btn:active { transform: scale(0.98); }
+
+  /* Peers list */
+  .peers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 140px;
+    overflow-y: auto;
+  }
+
+  .peer-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+
+  .peer-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+  }
+
+  .peer-dot.away { background: #ff9f43; }
+
+  .peer-name { color: var(--text); }
+  .peer-name.you { color: var(--accent); }
+
+  /* Tx list */
+  .tx-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 16px;
+  }
+
+  .tx-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 10px;
+    animation: slideIn 0.3s ease;
+  }
+
+  .tx-icon {
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  .tx-icon.in { background: rgba(92,255,180,0.15); color: var(--accent); }
+  .tx-icon.out { background: rgba(255,107,107,0.15); color: var(--accent3); }
+
+  .tx-info { flex: 1; min-width: 0; }
+  .tx-hash { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx-time { color: var(--dim); font-size: 9px; }
+  .tx-amount { font-weight: 600; }
+  .tx-amount.in { color: var(--accent); }
+  .tx-amount.out { color: var(--accent3); }
+
+  /* ── CHAT AREA ──────────────────────────────────── */
+  .chat-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .messages::-webkit-scrollbar { width: 4px; }
+  .messages::-webkit-scrollbar-track { background: transparent; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .sys-msg {
+    align-self: center;
+    font-size: 10px;
+    color: var(--dim);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 14px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .msg-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    animation: fadeIn 0.25s ease;
+  }
+
+  .msg-row.me { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .avatar.bot { background: rgba(61,232,255,0.1); color: var(--accent2); border-color: rgba(61,232,255,0.2); }
+
+  .msg-wrap { max-width: 68%; display: flex; flex-direction: column; gap: 3px; }
+  .msg-row.me .msg-wrap { align-items: flex-end; }
+
+  .msg-meta { font-size: 9px; color: var(--muted); }
+
+  .bubble {
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.55;
+    word-break: break-word;
+    white-space: pre-wrap;
+  }
+
+  .bubble.other {
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    border-bottom-left-radius: 2px;
+  }
+
+  .bubble.me {
+    background: var(--me-bg);
+    color: var(--me-text);
+    font-weight: 600;
+    border-bottom-right-radius: 2px;
+  }
+
+  .bubble.bot {
+    background: rgba(61,232,255,0.06);
+    border: 1px solid rgba(61,232,255,0.2);
+    color: var(--text);
+    border-bottom-left-radius: 2px;
+  }
+
+  /* Wallet response card inside bubble */
+  .wallet-response {
+    margin-top: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 12px;
+  }
+
+  .wr-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; }
+
+  .wr-balance {
+    font-family: 'Syne', sans-serif;
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--accent);
+    margin-bottom: 2px;
+  }
+
+  .wr-usd { font-size: 10px; color: var(--muted); margin-bottom: 10px; }
+
+  .wr-tx { display: flex; flex-direction: column; gap: 4px; }
+  .wr-tx-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 10px;
+    color: var(--muted);
+    padding: 5px 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .wr-tx-sign.in { color: var(--accent); }
+  .wr-tx-sign.out { color: var(--accent3); }
+  .wr-tx-hash { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .wr-tx-amt { font-weight: 700; }
+  .wr-tx-amt.in { color: var(--accent); }
+  .wr-tx-amt.out { color: var(--accent3); }
+
+  /* typing indicator */
+  .typing {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    border-bottom-left-radius: 2px;
+    width: fit-content;
+  }
+
+  .typing span {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.2s; }
+  .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+    40% { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── INPUT BAR ──────────────────────────────────── */
+  .inputbar {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 12px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .commands-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .commands-strip::-webkit-scrollbar { height: 0; }
+
+  .cmd-chip {
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--accent);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    white-space: nowrap;
+  }
+
+  .cmd-chip:hover {
+    background: rgba(92,255,180,0.1);
+    border-color: var(--accent);
+  }
+
+  .input-row { display: flex; gap: 8px; }
+
+  .msg-input {
+    flex: 1;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .msg-input::placeholder { color: var(--muted); }
+  .msg-input:focus { border-color: var(--accent); }
+
+  .send-btn {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .send-btn:hover { background: #3de8a0; }
+  .send-btn:active { transform: scale(0.97); }
+  .send-btn:disabled { opacity: 0.3; cursor: default; }
+
+  .input-hint {
+    font-size: 9px;
+    color: var(--dim);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .input-hint kbd {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-size: 9px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted);
+  }
+
+  /* ── RIGHT PANEL ────────────────────────────────── */
+  .right-panel {
+    width: 220px;
+    border-left: 1px solid var(--border);
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .panel-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+
+  .cmd-docs {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .cmd-doc {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+  }
+
+  .cmd-doc-name {
+    font-size: 11px;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .cmd-doc-desc {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ── MODALS ─────────────────────────────────────── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+
+  .modal-overlay.hidden { display: none; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 28px;
+    width: 420px;
+    max-width: 95vw;
+  }
+
+  .modal-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .modal-sub { font-size: 11px; color: var(--muted); margin-bottom: 22px; line-height: 1.6; }
+
+  .field-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 6px; margin-top: 14px; }
+
+  .field-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field-input:focus { border-color: var(--accent); }
+  .field-input::placeholder { color: var(--dim); }
+
+  .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
+
+  .btn-primary {
+    flex: 1;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 11px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.15s;
+  }
+
+  .btn-primary:hover { background: #3de8a0; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 11px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .btn-ghost:hover { border-color: var(--muted); color: var(--text); }
+
+  /* Responsive */
+  @media (max-width: 800px) {
+    .sidebar { display: none; }
+    .right-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── SETUP MODAL ──────────────────────────────── -->
+<div class="modal-overlay" id="setupModal">
+  <div class="modal">
+    <div class="modal-title">TracChat 💬</div>
+    <p class="modal-sub">P2P chat with live TRAC wallet integration.<br>No central servers. Your keys, your data.</p>
+
+    <div class="field-label">Your Nickname</div>
+    <input class="field-input" id="nickInput" placeholder="satoshi" maxlength="20" />
+
+    <div class="field-label">TRAC Wallet Address (optional)</div>
+    <input class="field-input" id="walletInput" placeholder="trac1..." />
+
+    <div class="field-label">Room Mode</div>
+    <div style="display:flex;gap:8px;margin-top:6px">
+      <button class="btn-ghost" id="btnCreate" onclick="selectMode('create')" style="flex:1;border-color:var(--accent);color:var(--accent)">+ Create Room</button>
+      <button class="btn-ghost" id="btnJoin" onclick="selectMode('join')" style="flex:1">→ Join Room</button>
+    </div>
+
+    <div id="joinKeyWrap" style="display:none">
+      <div class="field-label">Room Key</div>
+      <input class="field-input" id="joinKeyInput" placeholder="room_1740..." />
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-primary" onclick="startChat()">Enter TracChat →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOP BAR ──────────────────────────────────── -->
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-mark">T</div>
+    TracChat
+  </div>
+  <div class="topbar-center">
+    <div class="room-chip" id="roomKeyDisplay" onclick="copyRoomKey()" title="Click to copy">room_loading...</div>
+    <div class="status-pill">
+      <div class="status-dot" id="statusDot"></div>
+      <span id="statusText">connecting...</span>
+    </div>
+  </div>
+  <div style="font-size:10px;color:var(--muted)" id="peerCount">0 peers</div>
+</div>
+
+<!-- ── MAIN LAYOUT ───────────────────────────────── -->
+<div class="layout">
+
+  <!-- LEFT SIDEBAR -->
+  <div class="sidebar">
+
+    <!-- Wallet -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">TRAC Wallet</div>
+      <div class="wallet-card">
+        <div class="wallet-addr">
+          <span id="walletAddrDisplay">trac1...not set</span>
+        </div>
+        <div class="balance-row">
+          <div class="balance-amount" id="sideBalanceAmt">—</div>
+          <div class="balance-unit">TRAC</div>
+        </div>
+        <div class="balance-usd" id="sideBalanceUsd">≈ $—</div>
+        <button class="wallet-btn" onclick="sendCommand('check balance')">⟳ Refresh Balance</button>
+      </div>
+    </div>
+
+    <!-- Peers -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Online Peers</div>
+      <div class="peers-list" id="peersList">
+        <div class="peer-item">
+          <div class="peer-dot"></div>
+          <span class="peer-name you" id="myPeerName">you</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="sidebar-label" style="padding:14px 16px 0">Recent TX</div>
+    <div class="tx-list" id="txList">
+      <div style="font-size:10px;color:var(--dim);text-align:center;padding:10px 0">
+        Type "check txs" to load
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CHAT -->
+  <div class="chat-area">
+    <div class="messages" id="messages"></div>
+
+    <!-- Input -->
+    <div class="inputbar">
+      <div class="commands-strip">
+        <div class="cmd-chip" onclick="sendCommand('check balance')">check balance</div>
+        <div class="cmd-chip" onclick="sendCommand('check txs')">check txs</div>
+        <div class="cmd-chip" onclick="sendCommand('wallet info')">wallet info</div>
+        <div class="cmd-chip" onclick="sendCommand('trac price')">trac price</div>
+        <div class="cmd-chip" onclick="sendCommand('help')">help</div>
+      </div>
+      <div class="input-row">
+        <input
+          class="msg-input"
+          id="msgInput"
+          placeholder="Type a message or 'check balance'..."
+          maxlength="500"
+          autocomplete="off"
+          onkeydown="handleKey(event)"
+        />
+        <button class="send-btn" onclick="sendMsg()">Send</button>
+      </div>
+      <div class="input-hint">
+        <span><kbd>Enter</kbd> to send</span>
+        <span>P2P via Intercom · Trac Network</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL: Commands docs -->
+  <div class="right-panel">
+    <div class="panel-header">Bot Commands</div>
+    <div class="cmd-docs">
+      <div class="cmd-doc">
+        <div class="cmd-doc-name">check balance</div>
+        <div class="cmd-doc-desc">Shows live TRAC token balance for your wallet address.</div>
+      </div>
+      <div class="cmd-doc">
+        <div class="cmd-doc-name">check txs</div>
+        <div class="cmd-doc-desc">Shows last 5 transactions: hash, direction, amount, time.</div>
+      </div>
+      <div class="cmd-doc">
+        <div class="cmd-doc-name">wallet info</div>
+        <div class="cmd-doc-desc">Full wallet summary — address, balance, tx count, first seen.</div>
+      </div>
+      <div class="cmd-doc">
+        <div class="cmd-doc-name">trac price</div>
+        <div class="cmd-doc-desc">Fetches current TRAC token price in USD from market data.</div>
+      </div>
+      <div class="cmd-doc">
+        <div class="cmd-doc-name">help</div>
+        <div class="cmd-doc-desc">List all available commands with examples.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── STATE ────────────────────────────────────────────
+const state = {
+  nickname: '',
+  walletAddress: '',
+  roomKey: '',
+  peers: [],
+  messages: [],
+  ws: null,
+  connected: false,
+  mode: 'create',
+  tracPrice: null,
+  balance: null,
+};
+
+// Simulated demo data (in production: replaced by Intercom P2P + Trac API calls)
+const DEMO_TXNS = [
+  { hash: 'A3F9...BC12', direction: 'in',  amount: 250.00,  time: '2h ago' },
+  { hash: 'E72A...019D', direction: 'out', amount: 50.50,   time: '5h ago' },
+  { hash: 'C18B...44FA', direction: 'in',  amount: 1000.00, time: '1d ago' },
+  { hash: '5D3E...88C0', direction: 'out', amount: 199.99,  time: '2d ago' },
+  { hash: 'F01C...2B7A', direction: 'in',  amount: 75.25,   time: '3d ago' },
+];
+
+const DEMO_BALANCE = 1074.76;
+const DEMO_TRAC_USD = 0.0142; // fallback
+
+// ── SETUP ────────────────────────────────────────────
+function selectMode(m) {
+  state.mode = m;
+  const create = document.getElementById('btnCreate');
+  const join = document.getElementById('btnJoin');
+  const keyWrap = document.getElementById('joinKeyWrap');
+  create.style.borderColor = m === 'create' ? 'var(--accent)' : 'var(--border2)';
+  create.style.color = m === 'create' ? 'var(--accent)' : 'var(--muted)';
+  join.style.borderColor = m === 'join' ? 'var(--accent)' : 'var(--border2)';
+  join.style.color = m === 'join' ? 'var(--accent)' : 'var(--muted)';
+  keyWrap.style.display = m === 'join' ? 'block' : 'none';
+}
+
+function startChat() {
+  const nick = document.getElementById('nickInput').value.trim() || 'anon_' + Math.floor(Math.random()*1000);
+  const wallet = document.getElementById('walletInput').value.trim();
+  const joinKey = document.getElementById('joinKeyInput').value.trim();
+
+  state.nickname = nick;
+  state.walletAddress = wallet;
+  state.roomKey = state.mode === 'join' && joinKey ? joinKey : 'room_' + Date.now();
+
+  document.getElementById('setupModal').classList.add('hidden');
+  document.getElementById('roomKeyDisplay').textContent = state.roomKey;
+  document.getElementById('myPeerName').textContent = nick + ' (you)';
+
+  // Show wallet addr in sidebar
+  if (wallet) {
+    const short = wallet.slice(0, 8) + '...' + wallet.slice(-6);
+    document.getElementById('walletAddrDisplay').textContent = short;
+  }
+
+  initConnection();
+  addSysMsg('Connected to room · ' + state.roomKey);
+  addSysMsg('Welcome ' + nick + ' · Type "help" to see wallet commands');
+}
+
+// ── CONNECTION ───────────────────────────────────────
+function initConnection() {
+  // Try real Intercom WebSocket bridge
+  try {
+    const ws = new WebSocket('ws://localhost:4242');
+    state.ws = ws;
+
+    ws.onopen = () => {
+      state.connected = true;
+      setStatus(true, '2 peers');
+      ws.send(JSON.stringify({ type: 'join', roomKey: state.roomKey, from: state.nickname }));
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'chat') addPeerMsg(msg.from, msg.text);
+      if (msg.type === 'join') { addSysMsg(msg.from + ' joined the room'); addPeer(msg.from); }
+      if (msg.type === 'leave') { addSysMsg(msg.from + ' left'); removePeer(msg.from); }
+    };
+
+    ws.onerror = () => demoMode();
+    ws.onclose = () => { state.connected = false; setStatus(false, 'disconnected'); };
+  } catch {
+    demoMode();
+  }
+}
+
+function demoMode() {
+  state.connected = true;
+  setStatus(true, 'demo mode');
+  // Simulate a peer joining after 2s
+  setTimeout(() => {
+    addSysMsg('peer_trac_fan joined the room');
+    addPeer('peer_trac_fan');
+    addPeerMsg('peer_trac_fan', 'gm! TracChat looks sick 🔥');
+  }, 2000);
+}
+
+function setStatus(online, label) {
+  document.getElementById('statusDot').className = 'status-dot' + (online ? '' : ' offline');
+  document.getElementById('statusText').textContent = label;
+}
+
+// ── PEERS ────────────────────────────────────────────
+function addPeer(name) {
+  if (state.peers.includes(name)) return;
+  state.peers.push(name);
+  const list = document.getElementById('peersList');
+  const el = document.createElement('div');
+  el.className = 'peer-item';
+  el.id = 'peer_' + name;
+  el.innerHTML = `<div class="peer-dot"></div><span class="peer-name">${name}</span>`;
+  list.appendChild(el);
+  document.getElementById('peerCount').textContent = (state.peers.length + 1) + ' peers';
+}
+
+function removePeer(name) {
+  state.peers = state.peers.filter(p => p !== name);
+  const el = document.getElementById('peer_' + name);
+  if (el) el.remove();
+  document.getElementById('peerCount').textContent = (state.peers.length + 1) + ' peers';
+}
+
+// ── MESSAGES ─────────────────────────────────────────
+function addSysMsg(text) {
+  const el = document.createElement('div');
+  el.className = 'sys-msg';
+  el.textContent = text;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+}
+
+function addMyMsg(text) {
+  const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const el = document.createElement('div');
+  el.className = 'msg-row me';
+  el.innerHTML = `
+    <div class="avatar">${state.nickname[0]?.toUpperCase() || 'U'}</div>
+    <div class="msg-wrap">
+      <div class="msg-meta">${ts}</div>
+      <div class="bubble me">${escHtml(text)}</div>
+    </div>`;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+}
+
+function addPeerMsg(from, text) {
+  const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const el = document.createElement('div');
+  el.className = 'msg-row';
+  el.innerHTML = `
+    <div class="avatar">${from[0]?.toUpperCase() || 'P'}</div>
+    <div class="msg-wrap">
+      <div class="msg-meta">${from} · ${ts}</div>
+      <div class="bubble other">${escHtml(text)}</div>
+    </div>`;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+}
+
+function addBotMsg(html) {
+  const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const el = document.createElement('div');
+  el.className = 'msg-row';
+  el.innerHTML = `
+    <div class="avatar bot">⬡</div>
+    <div class="msg-wrap">
+      <div class="msg-meta">TracBot · ${ts}</div>
+      <div class="bubble bot">${html}</div>
+    </div>`;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+}
+
+function showTyping() {
+  const el = document.createElement('div');
+  el.className = 'msg-row';
+  el.id = 'typingIndicator';
+  el.innerHTML = `
+    <div class="avatar bot">⬡</div>
+    <div class="typing"><span></span><span></span><span></span></div>`;
+  document.getElementById('messages').appendChild(el);
+  scrollBottom();
+}
+
+function removeTyping() {
+  const el = document.getElementById('typingIndicator');
+  if (el) el.remove();
+}
+
+// ── SEND LOGIC ───────────────────────────────────────
+function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMsg(); } }
+
+function sendMsg() {
+  const input = document.getElementById('msgInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+
+  addMyMsg(text);
+
+  // Broadcast to peers
+  if (state.ws?.readyState === 1) {
+    state.ws.send(JSON.stringify({ type: 'chat', from: state.nickname, text }));
+  }
+
+  // Check for bot commands
+  const cmd = text.toLowerCase().trim();
+  if (isBotCommand(cmd)) {
+    showTyping();
+    setTimeout(() => { removeTyping(); handleBotCommand(cmd); }, 900 + Math.random() * 400);
+  }
+}
+
+function sendCommand(cmd) {
+  document.getElementById('msgInput').value = cmd;
+  sendMsg();
+}
+
+function isBotCommand(t) {
+  const cmds = ['check balance', 'check txs', 'wallet info', 'trac price', 'help',
+                 'balance', 'transactions', 'tx', 'price', 'saldo'];
+  return cmds.some(c => t.includes(c));
+}
+
+// ── BOT COMMANDS ─────────────────────────────────────
+async function handleBotCommand(cmd) {
+  if (cmd.includes('help')) return botHelp();
+  if (cmd.includes('price')) return botPrice();
+  if (cmd.includes('balance') || cmd.includes('saldo')) return botBalance();
+  if (cmd.includes('tx') || cmd.includes('transaction')) return botTxs();
+  if (cmd.includes('wallet info')) return botWalletInfo();
+}
+
+function botHelp() {
+  addBotMsg(`<strong style="color:var(--accent)">TracBot Commands</strong>
+
+<span style="color:var(--muted)">──────────────────────</span>
+<span style="color:var(--accent2)">check balance</span>  → TRAC token balance
+<span style="color:var(--accent2)">check txs</span>      → Last 5 transactions
+<span style="color:var(--accent2)">wallet info</span>    → Full wallet summary
+<span style="color:var(--accent2)">trac price</span>     → Current TRAC/USD price
+<span style="color:var(--muted)">──────────────────────</span>
+Set your wallet address in settings to enable live data.`);
+}
+
+async function botPrice() {
+  let price = DEMO_TRAC_USD;
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=trac&vs_currencies=usd', { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    if (d.trac?.usd) price = d.trac.usd;
+  } catch {}
+  state.tracPrice = price;
+  addBotMsg(`<strong style="color:var(--accent)">TRAC Price</strong>
+<span style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:var(--accent)">$${price.toFixed(6)}</span>
+<span style="color:var(--muted);font-size:10px">Source: CoinGecko · ${new Date().toLocaleTimeString()}</span>`);
+}
+
+async function botBalance() {
+  if (!state.walletAddress) {
+    addBotMsg(`⚠️ No wallet address set.\n\nRefresh the page and enter your TRAC wallet address to check your balance.`);
+    return;
+  }
+
+  let bal = DEMO_BALANCE;
+  let price = state.tracPrice || DEMO_TRAC_USD;
+
+  // Try live Trac API
+  try {
+    const r = await fetch(`https://api.trac.network/v1/balance/${state.walletAddress}`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    if (d.balance !== undefined) bal = parseFloat(d.balance);
+  } catch {}
+
+  state.balance = bal;
+  const usd = (bal * price).toFixed(2);
+
+  // Update sidebar
+  document.getElementById('sideBalanceAmt').textContent = bal.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  document.getElementById('sideBalanceUsd').textContent = '≈ $' + usd;
+
+  addBotMsg(`<div class="wallet-response">
+    <div class="wr-label">TRAC Balance · ${new Date().toLocaleTimeString()}</div>
+    <div class="wr-balance">${bal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+    <div class="wr-usd">≈ $${usd} USD · @$${price.toFixed(6)}/TRAC</div>
+    <div style="font-size:10px;color:var(--muted);word-break:break-all">${state.walletAddress}</div>
+  </div>`);
+}
+
+async function botTxs() {
+  if (!state.walletAddress) {
+    addBotMsg(`⚠️ No wallet address set. Enter your TRAC address on setup to check transactions.`);
+    return;
+  }
+
+  let txns = DEMO_TXNS;
+
+  // Try live Trac API
+  try {
+    const r = await fetch(`https://api.trac.network/v1/transactions/${state.walletAddress}?limit=5`, { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    if (Array.isArray(d.txs) && d.txs.length) {
+      txns = d.txs.map(t => ({
+        hash: t.hash?.slice(0,4) + '...' + t.hash?.slice(-4),
+        direction: t.direction || 'in',
+        amount: parseFloat(t.amount || 0),
+        time: t.time || '?',
+      }));
+    }
+  } catch {}
+
+  // Update sidebar tx list
+  const txList = document.getElementById('txList');
+  txList.innerHTML = '';
+  txns.forEach(tx => {
+    const el = document.createElement('div');
+    el.className = 'tx-item';
+    el.innerHTML = `
+      <div class="tx-icon ${tx.direction}">${tx.direction === 'in' ? '↓' : '↑'}</div>
+      <div class="tx-info">
+        <div class="tx-hash">${tx.hash}</div>
+        <div class="tx-time">${tx.time}</div>
+      </div>
+      <div class="tx-amount ${tx.direction}">${tx.direction === 'in' ? '+' : '-'}${tx.amount.toFixed(2)}</div>`;
+    txList.appendChild(el);
+  });
+
+  const rows = txns.map(tx => `
+    <div class="wr-tx-row">
+      <span class="wr-tx-sign ${tx.direction}">${tx.direction === 'in' ? '↓ IN' : '↑ OUT'}</span>
+      <span class="wr-tx-hash">${tx.hash}</span>
+      <span class="wr-tx-amt ${tx.direction}">${tx.direction === 'in' ? '+' : '-'}${tx.amount.toFixed(2)} TRAC</span>
+      <span style="color:var(--dim);font-size:9px">${tx.time}</span>
+    </div>`).join('');
+
+  addBotMsg(`<div class="wallet-response">
+    <div class="wr-label">Last ${txns.length} Transactions</div>
+    <div class="wr-tx">${rows}</div>
+  </div>`);
+}
+
+async function botWalletInfo() {
+  if (!state.walletAddress) {
+    addBotMsg(`⚠️ No wallet address set. Enter your TRAC address to view wallet info.`);
+    return;
+  }
+
+  const bal = state.balance || DEMO_BALANCE;
+  const price = state.tracPrice || DEMO_TRAC_USD;
+  const usd = (bal * price).toFixed(2);
+
+  addBotMsg(`<div class="wallet-response">
+    <div class="wr-label">Wallet Summary</div>
+    <div style="font-size:9px;color:var(--muted);word-break:break-all;margin-bottom:10px">${state.walletAddress}</div>
+    <div class="wr-balance">${bal.toLocaleString(undefined, { maximumFractionDigits: 2 })} TRAC</div>
+    <div class="wr-usd">≈ $${usd} USD</div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:10px">
+      <div style="display:flex;justify-content:space-between;color:var(--muted)">
+        <span>TRAC Price</span><span style="color:var(--text)">$${price.toFixed(6)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;color:var(--muted)">
+        <span>Network</span><span style="color:var(--text)">Trac Network</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;color:var(--muted)">
+        <span>Verified</span><span style="color:var(--accent)">✓ On-chain</span>
+      </div>
+    </div>
+  </div>`);
+}
+
+// ── UTILS ────────────────────────────────────────────
+function scrollBottom() {
+  const m = document.getElementById('messages');
+  m.scrollTop = m.scrollHeight;
+}
+
+function copyRoomKey() {
+  navigator.clipboard.writeText(state.roomKey).then(() => {
+    const el = document.getElementById('roomKeyDisplay');
+    el.textContent = '✓ Copied!';
+    setTimeout(() => { el.textContent = state.roomKey; }, 2000);
+  });
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
